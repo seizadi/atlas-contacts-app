@@ -14,12 +14,14 @@ import (
 	"database/sql"
 
 	"github.com/infobloxopen/atlas-app-toolkit/gateway"
-	"github.com/infobloxopen/atlas-app-toolkit/gorm/resource"
 	"github.com/infobloxopen/atlas-app-toolkit/health"
 	"github.com/infobloxopen/atlas-app-toolkit/server"
 	"github.com/infobloxopen/atlas-contacts-app/cmd"
+	"github.com/infobloxopen/atlas-contacts-app/cmd/setting"
 	migrate "github.com/infobloxopen/atlas-contacts-app/db"
 	"github.com/infobloxopen/atlas-contacts-app/pkg/pb"
+	"os"
+	"github.com/infobloxopen/atlas-app-toolkit/gorm/resource"
 )
 
 var (
@@ -36,8 +38,9 @@ func main() {
 	doneC := make(chan error)
 	logger := NewLogger()
 
-	go func() { doneC <- ServeInternal(logger) }()
-	go func() { doneC <- ServeExternal(logger) }()
+	//go func() { doneC <- ServeInternal(logger) }()
+	//go func() { doneC <- ServeExternal(logger) }()
+	doneC <- ServeInternal(logger)
 
 	if err := <-doneC; err != nil {
 		logger.Fatal(err)
@@ -45,15 +48,36 @@ func main() {
 }
 
 func init() {
-	// default server address; optionally set via command-line flags
-	flag.StringVar(&ServerAddress, "address", cmd.ServerAddress, "the gRPC server address")
-	flag.StringVar(&GatewayAddress, "gateway", cmd.GatewayAddress, "address of the gateway server")
-	flag.StringVar(&InternalAddress, "internal-addr", cmd.InternalAddress, "address of an internal http server, for endpoints that shouldn't be exposed to the public")
-	flag.StringVar(&SwaggerDir, "swagger-dir", cmd.SwaggerFile, "directory of the swagger.json file")
-	flag.StringVar(&DBConnectionString, "db", cmd.DBConnectionString, "the database address")
-	flag.StringVar(&AuthzAddr, "authz", "", "address of the authorization service")
-	flag.StringVar(&LogLevel, "log", "info", "log level")
+	configFile := flag.String("config", "", "path to config file")
+	homePath := flag.String("homepath", "", "path to app install/home path, defaults to working directory")
 	flag.Parse()
+	err := setting.NewConfigContext(&setting.CommandLineArgs{
+		Config:   *configFile,
+		HomePath: *homePath,
+		Args:     flag.Args(),
+	})
+	
+	if err != nil {
+		os.Exit(1)
+	}
+	
+	cmd.LoadConfig()
+	
+	// default server address; optionally set via command-line flags
+	//flag.StringVar(&ServerAddress, "address", cmd.ServerAddress, "the gRPC server address")
+	//flag.StringVar(&GatewayAddress, "gateway", cmd.GatewayAddress, "address of the gateway server")
+	//flag.StringVar(&InternalAddress, "internal-addr", cmd.InternalAddress, "address of an internal http server, for endpoints that shouldn't be exposed to the public")
+	//flag.StringVar(&SwaggerDir, "swagger-dir", cmd.SwaggerFile, "directory of the swagger.json file")
+	//flag.StringVar(&AuthzAddr, "authz", "", "address of the authorization service")
+	//flag.StringVar(&LogLevel, "log", cmd.LogLevel, "log level")
+	//flag.Parse()
+	ServerAddress = cmd.ServerAddress
+	GatewayAddress = cmd.GatewayAddress
+	InternalAddress = cmd.InternalAddress
+	SwaggerDir = cmd.SwaggerFile
+	// TODO - Need to initialize default value AuthzAddr
+	AuthzAddr = ""
+	LogLevel = cmd.LogLevel
 	resource.RegisterApplication(cmd.ApplicationID)
 }
 
