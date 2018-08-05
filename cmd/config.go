@@ -50,6 +50,9 @@ func LoadConfig() {
 	LoadAppConfig()
 	LoadServerConfig()
 	LoadDbConfig()
+	if (LogLevel == "debug") {
+		setting.ShowConfigSettings()
+	}
 }
 
 func LoadAppConfig() {

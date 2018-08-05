@@ -32,6 +32,24 @@ var (
 	appliedEnvOverrides          []string
 )
 
+func ShowConfigSettings() {
+	fmt.Println("Config Files:")
+	for _, f := range configFiles {
+		fmt.Println(f)
+	}
+	
+	fmt.Println("Command Line Args:")
+	for _, arg := range appliedCommandLineProperties {
+		fmt.Println(arg)
+	}
+	
+	fmt.Println("Environment Variable Overrides:")
+	for _, env := range appliedEnvOverrides {
+		fmt.Println(env)
+	}
+	
+}
+
 func NewConfigContext(args *CommandLineArgs) error {
 	setHomePath(args)
 	loadConfiguration(args)
