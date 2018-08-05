@@ -183,9 +183,6 @@ func loadSpecifedConfigFile(configFile string) error {
 	
 	for _, section := range userConfig.Sections() {
 		for _, key := range section.Keys() {
-			if key.Value() == "" {
-				continue
-			}
 			
 			defaultSec, err := Cfg.GetSection(section.Name())
 			if err != nil {
@@ -210,9 +207,9 @@ func applyEnvVariableOverrides() {
 			sectionName := strings.ToUpper(strings.Replace(section.Name(), ".", "_", -1))
 			keyName := strings.ToUpper(strings.Replace(key.Name(), ".", "_", -1))
 			envKey := fmt.Sprintf("ATLAS_%s_%s", sectionName, keyName)
-			envValue := os.Getenv(envKey)
+			envValue, present := os.LookupEnv(envKey)
 			
-			if len(envValue) > 0 {
+			if present {
 				key.SetValue(envValue)
 				if shouldRedactKey(envKey) {
 					envValue = "*********"

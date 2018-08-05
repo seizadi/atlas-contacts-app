@@ -1,6 +1,7 @@
 bin
 debug
 vendor
+conf/custom.ini
 
 # IDE stuff
 .vscode

@@ -2,7 +2,6 @@ package cmd
 
 import (
 	"fmt"
-	"flag"
 	"github.com/infobloxopen/atlas-contacts-app/cmd/setting"
 	"github.com/infobloxopen/atlas-contacts-app/db"
 )
@@ -42,6 +41,8 @@ var (
 	ApplicationID string
 	// Log Level
 	LogLevel string
+	// Address of the authorization service
+	AuthzAddr string
 )
 
 func LoadConfig() {
@@ -66,6 +67,7 @@ func LoadServerConfig() {
 	ServerAddress = fmt.Sprintf("%s:%s",domain, serverPort)
 	GatewayAddress = fmt.Sprintf("%s:%s",domain, gatewayPort)
 	InternalAddress = fmt.Sprintf("%s:%s",domain, internalPort)
+	AuthzAddr = server.Key("authz_addr").MustString("")
 }
 
 func LoadDbConfig(){
@@ -94,8 +96,4 @@ func SetDbConnectionString() {
 	}
 	DBConnectionString = fmt.Sprintf("user=%s password=%s host=%s port=%s dbname=%s sslmode=%s sslcert=%s sslkey=%s sslrootcert=%s",
 		DbCfg.User, DbCfg.Pwd, DbCfg.Host, DbCfg.Port, DbCfg.Name, DbCfg.SslMode, DbCfg.ClientCertPath, DbCfg.ClientKeyPath, DbCfg.CaCertPath)
-	// For now hard code it
-	DBConnectionString = "host=localhost port=5432 user=postgres password=postgres sslmode=disable dbname=atlas_contacts_app"
-	flag.StringVar(&DBConnectionString, "db", DBConnectionString, "the database address")
-	
 }

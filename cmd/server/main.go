@@ -24,23 +24,12 @@ import (
 	"github.com/infobloxopen/atlas-app-toolkit/gorm/resource"
 )
 
-var (
-	ServerAddress      string
-	GatewayAddress     string
-	InternalAddress    string
-	SwaggerDir         string
-	DBConnectionString string
-	AuthzAddr          string
-	LogLevel           string
-)
-
 func main() {
 	doneC := make(chan error)
 	logger := NewLogger()
 
-	//go func() { doneC <- ServeInternal(logger) }()
-	//go func() { doneC <- ServeExternal(logger) }()
-	doneC <- ServeInternal(logger)
+	go func() { doneC <- ServeInternal(logger) }()
+	go func() { doneC <- ServeExternal(logger) }()
 
 	if err := <-doneC; err != nil {
 		logger.Fatal(err)
@@ -63,21 +52,6 @@ func init() {
 	
 	cmd.LoadConfig()
 	
-	// default server address; optionally set via command-line flags
-	//flag.StringVar(&ServerAddress, "address", cmd.ServerAddress, "the gRPC server address")
-	//flag.StringVar(&GatewayAddress, "gateway", cmd.GatewayAddress, "address of the gateway server")
-	//flag.StringVar(&InternalAddress, "internal-addr", cmd.InternalAddress, "address of an internal http server, for endpoints that shouldn't be exposed to the public")
-	//flag.StringVar(&SwaggerDir, "swagger-dir", cmd.SwaggerFile, "directory of the swagger.json file")
-	//flag.StringVar(&AuthzAddr, "authz", "", "address of the authorization service")
-	//flag.StringVar(&LogLevel, "log", cmd.LogLevel, "log level")
-	//flag.Parse()
-	ServerAddress = cmd.ServerAddress
-	GatewayAddress = cmd.GatewayAddress
-	InternalAddress = cmd.InternalAddress
-	SwaggerDir = cmd.SwaggerFile
-	// TODO - Need to initialize default value AuthzAddr
-	AuthzAddr = ""
-	LogLevel = cmd.LogLevel
 	resource.RegisterApplication(cmd.ApplicationID)
 }
 
@@ -93,8 +67,8 @@ func NewLogger() *logrus.Logger {
 		"fatal":   logrus.FatalLevel,
 		"panic":   logrus.PanicLevel,
 	}
-	if level, ok := logLevels[LogLevel]; !ok {
-		logger.Errorf("Invalid value %q provided for log level", LogLevel)
+	if level, ok := logLevels[cmd.LogLevel]; !ok {
+		logger.Errorf("Invalid value %q provided for log level", cmd.LogLevel)
 		logger.SetLevel(logrus.InfoLevel)
 	} else {
 		logger.SetLevel(level)
@@ -107,7 +81,7 @@ func NewLogger() *logrus.Logger {
 func ServeInternal(logger *logrus.Logger) error {
 	healthChecker := health.NewChecksHandler("/healthz", "/ready")
 	healthChecker.AddReadiness("DB ready check", dbReady)
-	healthChecker.AddLiveness("ping", health.HTTPGetCheck(fmt.Sprint("http://", InternalAddress, "/ping"), time.Minute))
+	healthChecker.AddLiveness("ping", health.HTTPGetCheck(fmt.Sprint("http://", cmd.InternalAddress, "/ping"), time.Minute))
 
 	s, err := server.NewServer(
 		// register our health checks
@@ -119,36 +93,42 @@ func ServeInternal(logger *logrus.Logger) error {
 		})),
 	)
 	if err != nil {
+		logger.Errorf("Failed to Start Internal Server %v", err)
 		return err
 	}
-	l, err := net.Listen("tcp", InternalAddress)
+	l, err := net.Listen("tcp", cmd.InternalAddress)
 	if err != nil {
+		logger.Errorf("Failed to Listen at healthChecker %q %v", cmd.InternalAddress, err)
 		return err
 	}
 
-	logger.Debugf("serving internal http at %q", InternalAddress)
+	logger.Debugf("serving internal http at %q", cmd.InternalAddress)
 
 	return s.Serve(nil, l)
 }
 
 // ServeExternal builds and runs the server that listens on ServerAddress and GatewayAddress
 func ServeExternal(logger *logrus.Logger) error {
-	dbSQL, err := sql.Open("postgres", DBConnectionString)
+	dbSQL, err := sql.Open("postgres", cmd.DBConnectionString)
 	if err != nil {
+		logger.Errorf("Failed to Open DB %s, %v", cmd.DBConnectionString, err)
 		return err
 	}
 	defer dbSQL.Close()
 	if err := migrate.MigrateDB(*dbSQL); err != nil {
+		logger.Errorf("Failed to Migrate DB %s, %v", cmd.DBConnectionString, err)
 		return err
 	}
 	db, err := gorm.Open("postgres", dbSQL)
 	if err != nil {
+		logger.Errorf("Failed to Open DB %s, %v", cmd.DBConnectionString, err)
 		return err
 	}
 	defer db.Close()
 
 	grpcServer, err := NewGRPCServer(logger, db)
 	if err != nil {
+		logger.Errorf("Failed to create GRPC Server %v", err)
 		return err
 	}
 
@@ -157,36 +137,39 @@ func ServeExternal(logger *logrus.Logger) error {
 		server.WithGrpcServer(grpcServer),
 		// register the gateway to proxy to the given server address with the service registration endpoints
 		server.WithGateway(
-			gateway.WithServerAddress(ServerAddress),
+			gateway.WithServerAddress(cmd.ServerAddress),
 			gateway.WithEndpointRegistration("/v1/", pb.RegisterProfilesHandlerFromEndpoint, pb.RegisterGroupsHandlerFromEndpoint, pb.RegisterContactsHandlerFromEndpoint),
 		),
 		// serve swagger at the root
 		server.WithHandler("/swagger", http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
-			http.ServeFile(writer, request, SwaggerDir)
+			http.ServeFile(writer, request, cmd.SwaggerFile)
 		})),
 	)
 	if err != nil {
+		logger.Errorf("Failed to Start External Server %v", err)
 		return err
 	}
 
 	// open some listeners for our server and gateway
-	grpcL, err := net.Listen("tcp", ServerAddress)
+	grpcL, err := net.Listen("tcp", cmd.ServerAddress)
 	if err != nil {
+		logger.Errorf("Failed to Listen at http %q %v", cmd.ServerAddress, err)
 		return err
 	}
-	gatewayL, err := net.Listen("tcp", GatewayAddress)
+	gatewayL, err := net.Listen("tcp", cmd.GatewayAddress)
 	if err != nil {
+		logger.Errorf("Failed to Listen at gRPC %q %v", cmd.GatewayAddress, err)
 		return err
 	}
 
-	logger.Debugf("serving gRPC at %q", ServerAddress)
-	logger.Debugf("serving http at %q", GatewayAddress)
+	logger.Debugf("serving gRPC at %q", cmd.ServerAddress)
+	logger.Debugf("serving http at %q", cmd.GatewayAddress)
 
 	return s.Serve(grpcL, gatewayL)
 }
 
 func dbReady() error {
-	db, err := gorm.Open("postgres", DBConnectionString)
+	db, err := gorm.Open("postgres", cmd.DBConnectionString)
 	if err != nil {
 		return err
 	}
