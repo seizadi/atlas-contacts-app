@@ -52,16 +52,23 @@ spec:
     spec:
       containers:
       - name: server
-        args:
-        - "-db"
-        - "host=postgres port=5432 user=postgres password=postgres sslmode=disable dbname=contacts"
-        - "-log"
-        - "debug"
+        env:
+          - name: "ATLAS_DATABASE_HOST"
+            value: "contactsappdbserver.default.svc.cluster.local"
+          - name: "ATLAS_DATABASE_NAME"
+            value: "contactsappdb"
+          - name: "ATLAS_DATABASE_USER"
+            value: "atlasdbadmin"
+          - name: "ATLAS_DATABASE_PASSWORD"
+            value: "Inf@blox"
+          - name: "ATLAS_LOG_LEVEL"
+            value: "debug"
         # uncomment to add authorization to the contacts-app example. Please
         # note that authz also needs to be running in order to authorize
         # requests to the contacts-app
-        # - "-authz=themis.authz:5555"
-        image: infoblox/contacts-server:latest
+        # - name: "ATLAS_SERVER_AUTHZ_ADDR"
+        #   value: "themis.authz:5555"
+        image: soheileizadi/contacts-server:latest
         imagePullPolicy: Always
         ports:
         - containerPort: 8080

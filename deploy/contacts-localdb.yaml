@@ -30,5 +30,5 @@ metadata:
   name: contactsappschema
 spec:
   database: contactsappdb
-  git: github://<USERNAME:<TOKEN>@infobloxopen/atlas-contacts-app/db/migrations
+  git: github://seizadi:20bdc33b2f36f0d9c59da25c5f0ecc3d6dc5c4d3@infobloxopen/atlas-contacts-app/db/migrations
   version: 0002

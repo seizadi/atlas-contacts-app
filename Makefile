@@ -6,7 +6,7 @@ DOCKERFILE_PATH := $(CURDIR)/docker
 USERNAME       := $(USER)
 GIT_COMMIT     := $(shell git describe --dirty=-unsupported --always || echo pre-commit)
 IMAGE_VERSION  ?= $(USERNAME)-dev-$(GIT_COMMIT)
-IMAGE_REGISTRY ?= infoblox
+IMAGE_REGISTRY ?= soheileizadi
 
 # configuration for server binary and image
 SERVER_BINARY     := $(BUILD_PATH)/server

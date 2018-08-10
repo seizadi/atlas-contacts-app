@@ -10,4 +10,5 @@ FROM alpine:latest AS runner
 WORKDIR /bin
 COPY --from=builder /go/src/github.com/infobloxopen/atlas-contacts-app/bin/server .
 COPY pkg/pb/contacts.swagger.json /go/src/github.com/infobloxopen/atlas-contacts-app/www/swagger.json
+COPY conf/ /go/src/github.com/infobloxopen/atlas-contacts-app/conf/
 ENTRYPOINT ["server", "-homepath", "/go/src/github.com/infobloxopen/atlas-contacts-app", "cfg:paths.swagger=/go/src/github.com/infobloxopen/atlas-contacts-app/www/swagger.json"]
