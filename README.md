@@ -341,3 +341,432 @@ Give an example
 ## Versioning
 
 We use [SemVer](http://semver.org/) for versioning. For the versions available, see the [tags on this repository](https://github.com/your/project/tags).
+
+## Traefik
+A long time ago it seems that JohnB and I were working on the first
+of this contacts app. JohnB had the AWS LB working with LoadBalancer.
+We started to implement NGP API GW and decided to use NginX Ingress and
+I worked on the first integration of this using a Beta version of NginX
+Ingress, now it is a mature product. I see really that the NginX behavior
+has not changed, after all NginX is trying to
+[sell its Nginx+ product](https://www.loadbalancer.org/blog/nginx-vs-haproxy/).
+So, it cripples its free opensource in a way that’s merely giving a taste
+to small projects in the hope that once they grow
+(together with their needs), they’ll stay hooked and buy into the system.
+
+I started to debug a problem with my project that after hours could not
+figure out :( I could have created a debug version of the Nginx Ingress
+Controller to figure out in more detail why it was not working, but
+instead use the chance to play with
+[Traefik Ingress Controller](https://docs.traefik.io/user-guide/kubernetes/),
+to see if it would be easier to deploy and debug. Traefik Ingress was
+not available when we were doing our early work but is a more mature
+product and unlike Nginx does not suffer from conflict of interest.
+
+### Deployment
+We start by removing Nginx from Minikube setup:
+```bash
+minikube addons disable ingress
+minikube stop
+minikube start
+```
+You can make sure Nginx is not running:
+```bash
+kubectl --namespace=kube-system get pods
+```
+
+Install Traefik by setting up the ClusterRoleBinding
+```yaml
+---
+kind: ClusterRole
+apiVersion: rbac.authorization.k8s.io/v1beta1
+metadata:
+  name: traefik-ingress-controller
+rules:
+  - apiGroups:
+      - ""
+    resources:
+      - services
+      - endpoints
+      - secrets
+    verbs:
+      - get
+      - list
+      - watch
+  - apiGroups:
+      - extensions
+    resources:
+      - ingresses
+    verbs:
+      - get
+      - list
+      - watch
+---
+kind: ClusterRoleBinding
+apiVersion: rbac.authorization.k8s.io/v1beta1
+metadata:
+  name: traefik-ingress-controller
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: traefik-ingress-controller
+subjects:
+- kind: ServiceAccount
+  name: traefik-ingress-controller
+  namespace: kube-system
+```
+```bash
+kubectl apply -f https://raw.githubusercontent.com/containous/traefik/master/examples/k8s/traefik-rbac.yaml
+```
+
+The user's manual has a good description of using Deployment or
+DaemonSet, repeated below.
+
+It is possible to use Træfik with a Deployment or a DaemonSet object,
+whereas both options have their own pros and cons:
+
+   * The scalability can be much better when using a Deployment,
+   because you will have a Single-Pod-per-Node model when using a
+   DaemonSet, whereas you may need less replicas based on your
+   environment when using a Deployment.
+   * DaemonSets automatically scale to new nodes, when the nodes
+   join the cluster, whereas Deployment pods are only scheduled on
+   new nodes if required.
+   * DaemonSets ensure that only one replica of pods run on any
+   single node. Deployments require affinity settings if you want
+   to ensure that two pods don't end up on the same node.
+   * DaemonSets can be run with the NET_BIND_SERVICE capability,
+   which will allow it to bind to port 80/443/etc on each host.
+   This will allow bypassing the kube-proxy, and reduce traffic hops.
+   Note that this is against the Kubernetes Best Practices Guidelines,
+   and raises the potential for scheduling/scaling issues.
+   Despite potential issues, this remains the choice for most
+   ingress controllers.
+   * If you are unsure which to choose, start with the Daemonset.
+
+I am using minikube and have only one node and will use a deployment
+for the documentation below so you can follow along:
+```yaml
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: traefik-ingress-controller
+  namespace: kube-system
+---
+kind: Deployment
+apiVersion: extensions/v1beta1
+metadata:
+  name: traefik-ingress-controller
+  namespace: kube-system
+  labels:
+    k8s-app: traefik-ingress-lb
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      k8s-app: traefik-ingress-lb
+  template:
+    metadata:
+      labels:
+        k8s-app: traefik-ingress-lb
+        name: traefik-ingress-lb
+    spec:
+      serviceAccountName: traefik-ingress-controller
+      terminationGracePeriodSeconds: 60
+      containers:
+      - image: traefik
+        name: traefik-ingress-lb
+        ports:
+        - name: http
+          containerPort: 80
+        - name: admin
+          containerPort: 8080
+        args:
+        - --api
+        - --kubernetes
+        - --logLevel=INFO
+---
+kind: Service
+apiVersion: v1
+metadata:
+  name: traefik-ingress-service
+  namespace: kube-system
+spec:
+  selector:
+    k8s-app: traefik-ingress-lb
+  ports:
+    - protocol: TCP
+      port: 80
+      name: web
+    - protocol: TCP
+      port: 8080
+      name: admin
+  type: NodePort
+```
+```bash
+kubectl apply -f https://raw.githubusercontent.com/containous/traefik/master/examples/k8s/traefik-deployment.yaml
+```
+You should now see the Traefik Ingress Controller Pod running
+```bash
+kubectl --namespace=kube-system get pods
+```
+I created a kube-traefik.yaml to track the changes for this PoC,
+the main change as you would guess is to the Ingress:
+```yaml
+---
+apiVersion: extensions/v1beta1
+kind: Ingress
+metadata:
+  namespace: contacts
+  name: contacts-app-ingress
+  annotations:
+    kubernetes.io/ingress.class: traefik
+
+spec:
+  rules:
+  - http:
+      paths:
+      - path: /atlas-contacts-app
+        backend:
+          serviceName: contacts-app
+          servicePort: 8080
+---
+```
+```bash
+kubectl apply -f kube-traefik.yaml
+```
+Now I have an error when trying to use my contacts-app service.
+It works from inside the cluster, but not from Ingress!
+```bash
+seizadi$ export JWT="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJBY2NvdW50SUQiOjF9.GsXyFDDARjXe1t9DPo2LIBKHEal3O7t3vLI3edA7dGU"
+seizadi$ curl -H "Authorization: Bearer $JWT" http://minikube/v1/contacts
+curl: (7) Failed to connect to minikube port 80: Connection refused
+
+seizadi$ k run -it --rm --image=infoblox/dnstools api-test
+dnstools# export JWT="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJBY2NvdW50SUQiOjF9.GsXyFDDARjXe1t9DPo2LIBKHEal3O7t3vLI3edA7dGU"
+dnstools# curl -H "Authorization: Bearer $JWT" http://10.97.90.18:8080/v1/contacts | jq
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+100    38  100    38    0     0  12666      0 --:--:-- --:--:-- --:--:-- 12666
+{
+  "success": {
+    "status": 200,
+    "code": "OK"
+  }
+}
+```
+Lets start by creating a Service and an Ingress that will expose
+the Træfik Web UI.
+```yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: traefik-web-ui
+  namespace: kube-system
+spec:
+  selector:
+    k8s-app: traefik-ingress-lb
+  ports:
+  - port: 80
+    targetPort: 8080
+---
+apiVersion: extensions/v1beta1
+kind: Ingress
+metadata:
+  name: traefik-web-ui
+  namespace: kube-system
+  annotations:
+    kubernetes.io/ingress.class: traefik
+spec:
+  rules:
+  - host: traefik-ui.minikube
+    http:
+      paths:
+      - backend:
+          serviceName: traefik-web-ui
+          servicePort: 80
+
+
+```
+```bash
+kubectl apply -f https://raw.githubusercontent.com/containous/traefik/master/examples/k8s/ui.yaml
+```
+Now lets setup an entry in our /etc/hosts file to route
+traefik-ui.minikube to our cluster.
+
+In production you would want to set up real DNS entries:
+```bash
+echo "$(minikube ip) traefik-ui.minikube" | sudo tee -a /etc/hosts
+```
+We should now be able to visit
+[traefik-ui.minikube](http://traefik-ui.minikube/)
+in the browser and view the Træfik web UI. I found that I could
+not bring up the UI on the default port but I could on the
+proxy port.
+```bash
+seizadi$ kubectl get services --namespace=kube-system
+NAME                      CLUSTER-IP      EXTERNAL-IP   PORT(S)                       AGE
+kube-dns                  10.96.0.10      <none>        53/UDP,53/TCP                 2d
+kubernetes-dashboard      10.102.113.90   <nodes>       80:30000/TCP                  2d
+traefik-ingress-service   10.105.72.46    <nodes>       80:30894/TCP,8080:31343/TCP   57m
+```
+So I was able to bring up UI on http://traefik-ui.minikube:31343,
+so it seems to be a problem with Ingress Controller binding to NodePort
+but not the default port.
+
+I created a host for the contacts app:
+```bash
+echo "$(minikube ip) contacts.minikube" | sudo tee -a /etc/hosts
+```
+Now when I target the Nodeports I get a 404 error but not can not
+get to service :(
+```bash
+seizadi$ curl -H "Authorization: Bearer $JWT" http://contacts.minikube:30894/v1/contacts
+404 page not found
+seizadi$ curl -H "Authorization: Bearer $JWT" http://contacts.minikube:31343/v1/contacts
+404 page not found
+```
+
+So I removed the Traefik Deployment and created DaemonSet:
+```yaml
+The DaemonSet objects looks not much different:
+
+
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: traefik-ingress-controller
+  namespace: kube-system
+---
+kind: DaemonSet
+apiVersion: extensions/v1beta1
+metadata:
+  name: traefik-ingress-controller
+  namespace: kube-system
+  labels:
+    k8s-app: traefik-ingress-lb
+spec:
+  template:
+    metadata:
+      labels:
+        k8s-app: traefik-ingress-lb
+        name: traefik-ingress-lb
+    spec:
+      serviceAccountName: traefik-ingress-controller
+      terminationGracePeriodSeconds: 60
+      containers:
+      - image: traefik
+        name: traefik-ingress-lb
+        ports:
+        - name: http
+          containerPort: 80
+          hostPort: 80
+        - name: admin
+          containerPort: 8080
+        securityContext:
+          capabilities:
+            drop:
+            - ALL
+            add:
+            - NET_BIND_SERVICE
+        args:
+        - --api
+        - --kubernetes
+        - --logLevel=INFO
+---
+kind: Service
+apiVersion: v1
+metadata:
+  name: traefik-ingress-service
+  namespace: kube-system
+spec:
+  selector:
+    k8s-app: traefik-ingress-lb
+  ports:
+    - protocol: TCP
+      port: 80
+      name: web
+    - protocol: TCP
+      port: 8080
+      name: admin
+```
+```bash
+kubectl -n kube-system delete deployment traefik-ingress-controller
+kubectl apply -f https://raw.githubusercontent.com/containous/traefik/master/examples/k8s/traefik-ds.yaml
+serviceaccount "traefik-ingress-controller" configured
+daemonset "traefik-ingress-controller" created
+The Service "traefik-ingress-service" is invalid:
+* spec.ports[0].nodePort: Forbidden: may not be used when `type` is 'ClusterIP'
+* spec.ports[1].nodePort: Forbidden: may not be used when `type` is 'ClusterIP'
+```
+Now I can log into the UI properly but have the flagged errors with ClusterIP!!
+To debug the above problem tried to use replace instead of apply:
+```bash
+kubectl replace -f https://raw.githubusercontent.com/containous/traefik/master/examples/k8s/traefik-ds.yaml
+serviceaccount "traefik-ingress-controller" replaced
+Error from server (NotFound): error when replacing "https://raw.githubusercontent.com/containous/traefik/master/examples/k8s/traefik-ds.yaml": daemonsets.extensions "traefik-ingress-controller" not found
+Error from server (Invalid): error when replacing "https://raw.githubusercontent.com/containous/traefik/master/examples/k8s/traefik-ds.yaml": Service "traefik-ingress-service" is invalid: spec.clusterIP: Invalid value: "": field is immutable
+```
+Looks like I removed the deployment but not the service,
+so I removed the service and now DaemonSet works as expected:
+```bash
+k -n kube-system delete svc traefik-ingress-service
+kubectl apply -f https://raw.githubusercontent.com/containous/traefik/master/examples/k8s/traefik-ds.yaml
+Warning: kubectl apply should be used on resource created by either kubectl create --save-config or kubectl apply
+serviceaccount "traefik-ingress-controller" configured
+daemonset "traefik-ingress-controller" created
+service "traefik-ingress-service" created
+```
+Now I can get back to the problem with contacts-app it ends up it was a
+path problem, so I setup the Ingress like so:
+```yaml
+---
+apiVersion: extensions/v1beta1
+kind: Ingress
+metadata:
+  namespace: contacts
+  name: contacts-app-ingress
+  annotations:
+
+spec:
+  rules:
+  - host: contacts.minikube
+    http:
+      paths:
+#      - path: /atlas-contacts-app
+      - path: /
+        backend:
+          serviceName: contacts-app
+          servicePort: 8080
+```
+Now the curl works!
+```bash
+seizadi$ curl -H "Authorization: Bearer $JWT" http://contacts.minikube/v1/contacts
+{"success":{"status":200,"code":"OK"}}
+```
+This is not acceptable we want the application to work with the
+'/atlas-contacts-app' path and need more configuration for Ingress.
+This is what the service annontation looks like to get this to work:
+```yaml
+---
+apiVersion: extensions/v1beta1
+kind: Ingress
+metadata:
+  namespace: contacts
+  name: contacts-app-ingress
+  annotations:
+    kubernetes.io/ingress.class: traefik
+    traefik.frontend.rule.type: PathPrefixStrip
+
+spec:
+  rules:
+  - host: contacts.minikube
+    http:
+      paths:
+      - path: /atlas-contacts-app
+        backend:
+          serviceName: contacts-app
+          servicePort: 8080
+```

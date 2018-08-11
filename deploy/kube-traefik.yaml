@@ -1,0 +1,99 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: contacts-app
+  namespace: contacts
+  labels:
+    app: contacts-app
+spec:
+  type: NodePort
+  ports:
+    - name: http
+      port: 8080
+      protocol: TCP
+      nodePort: 31500
+  selector:
+    app: contacts-app
+---
+apiVersion: extensions/v1beta1
+kind: Ingress
+metadata:
+  namespace: contacts
+  name: contacts-app-ingress
+  annotations:
+    kubernetes.io/ingress.class: traefik
+    traefik.frontend.rule.type: PathPrefixStrip
+
+spec:
+  rules:
+  - host: contacts.minikube
+    http:
+      paths:
+      - path: /atlas-contacts-app
+        backend:
+          serviceName: contacts-app
+          servicePort: 8080
+---
+apiVersion: extensions/v1beta1
+kind: Deployment
+metadata:
+  name: contacts-app
+  namespace: contacts
+  labels:
+    app: contacts-app
+spec:
+  selector:
+    matchLabels:
+      app: contacts-app
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: contacts-app
+    spec:
+      containers:
+      - name: server
+        env:
+          - name: "ATLAS_DATABASE_HOST"
+            value: "contactsappdbserver.default.svc.cluster.local"
+          - name: "ATLAS_DATABASE_NAME"
+            value: "contactsappdb"
+          - name: "ATLAS_DATABASE_USER"
+            value: "atlasdbadmin"
+          - name: "ATLAS_DATABASE_PASSWORD"
+            value: "Inf@blox"
+          - name: "ATLAS_LOG_LEVEL"
+            value: "debug"
+        # uncomment to add authorization to the contacts-app example. Please
+        # note that authz also needs to be running in order to authorize
+        # requests to the contacts-app
+        # - name: "ATLAS_SERVER_AUTHZ_ADDR"
+        #   value: "themis.authz:5555"
+        image: soheileizadi/contacts-server:latest
+        imagePullPolicy: Always
+        ports:
+        - containerPort: 8080
+          protocol: TCP
+        - containerPort: 8081
+          protocol: TCP
+        - containerPort: 9090
+          protocol: TCP
+        livenessProbe:
+          httpGet:
+            path: /healthz
+            port: 8081
+            scheme: HTTP
+          initialDelaySeconds: 5
+          periodSeconds: 5
+          successThreshold: 1
+          failureThreshold: 10
+        readinessProbe:
+          httpGet:
+            path: /ready
+            port: 8081
+            scheme: HTTP
+          initialDelaySeconds: 5
+          periodSeconds: 5
+          successThreshold: 1
+          failureThreshold: 10
+---
