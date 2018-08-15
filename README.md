@@ -770,3 +770,16 @@ spec:
           serviceName: contacts-app
           servicePort: 8080
 ```
+The next step is to look at the AuthN stub that we have for NginX, it
+looks like Traefik calls this feature
+[Forward Authentication](https://docs.traefik.io/configuration/entrypoints/#forward-authentication)
+need to figure out proper annotations to turn this on for
+Traefik Ingress. Here are
+[Ingress Forward Auth](https://stackoverflow.com/questions/50964605/traefik-forward-authentication-in-k8s-ingress-controller)
+Looks like the feature is not in the latest 1.6 but in 1.7RC
+[Traefik 1.7RC Doc](https://docs.traefik.io/v1.7/configuration/backends/kubernetes/#authentication)
+We are running 1.6.5 which is the latest:
+```bash
+$ k -n kube-system logs traefik-ingress-controller-rqv65
+time="2018-08-11T00:25:19Z" level=info msg="Traefik version v1.6.5 built on 2018-07-10_03:54:03PM"
+```
