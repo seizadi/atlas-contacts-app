@@ -181,8 +181,8 @@
             "Name":"contacts-server",
             "Cpu":"10",
             "Essential":"true",
-            "Image":"https://hub.docker.com/r/soheileizadi/contacts-server:latest",
-            "Memory":"300",
+            "Image":"soheileizadi/contacts-server:latest",
+            "Memory":"1024",
             "LogConfiguration":{
               "LogDriver":"awslogs",
               "Options":{
@@ -192,21 +192,20 @@
                 "awslogs-region":{
                   "Ref":"AWS::Region"
                 },
-                "awslogs-stream-prefix":"ecs-demo-app"
+                "awslogs-stream-prefix":"contacts-server"
               }
             },
             "PortMappings":[
               {
-                "ContainerPort":8080,
-                "ContainerPort":8081,
+                "ContainerPort": 8080
+              },
+              {
+                "ContainerPort": 8081
+              },
+              {
                 "ContainerPort":9090
               }
             ]
-          }
-        ],
-        "Volumes":[
-          {
-            "Name":"my-vol"
           }
         ]
       }
@@ -282,8 +281,9 @@
       "DependsOn":"ECSALB",
       "Properties":{
         "HealthCheckIntervalSeconds":10,
-        "HealthCheckPath":"/",
+        "HealthCheckPath":"/healthz",
         "HealthCheckProtocol":"HTTP",
+        "HealthCheckPort":8081,
         "HealthCheckTimeoutSeconds":5,
         "HealthyThresholdCount":2,
         "Name":"ECSTG",
@@ -388,7 +388,7 @@
         "DesiredCount":"1",
         "LoadBalancers":[
           {
-            "ContainerName":"simple-app",
+            "ContainerName":"contact-app",
             "ContainerPort":"80",
             "TargetGroupArn":{
               "Ref":"ECSTG"
