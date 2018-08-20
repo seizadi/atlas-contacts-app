@@ -1,0 +1,82 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: swagger-ui
+  namespace: default
+  labels:
+    app: swagger-ui
+spec:
+  type: NodePort
+  ports:
+    - name: http
+      port: 8080
+      protocol: TCP
+  selector:
+    app: swagger-ui
+---
+apiVersion: extensions/v1beta1
+kind: Ingress
+metadata:
+  namespace: default
+  name: swagger-ui-ingress
+  annotations:
+#    nginx.ingress.kubernetes.io/rewrite-target: /
+
+spec:
+  rules:
+  - host: minikube
+    http:
+      paths:
+      - path: /
+        backend:
+          serviceName: swagger-ui
+          servicePort: 8080
+---
+apiVersion: extensions/v1beta1
+kind: Deployment
+metadata:
+  name: swagger-ui
+  namespace: default
+  labels:
+    app: swagger-ui
+spec:
+  selector:
+    matchLabels:
+      app: swagger-ui
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: swagger-ui
+    spec:
+      containers:
+      - name: swagger-ui
+#        args:
+#          - "-e BASE_URL=http://192.168.99.100/swagger"
+#          - "-e API_URL='http://contacts-app.contacts.svc.cluster.local:8080/swagger'"
+#          - "-e API_URL='http://192.168.99.100/atlas-contacts-app/swagger'"
+#        image: swaggerapi/swagger-ui
+        image: swaggerapi/swagger-editor
+        imagePullPolicy: Always
+        ports:
+        - containerPort: 8080
+          protocol: TCP
+#        livenessProbe:
+#          httpGet:
+#            path: /
+#            port: 8080
+#            scheme: HTTP
+#          initialDelaySeconds: 5
+#          periodSeconds: 5
+#          successThreshold: 1
+#          failureThreshold: 10
+#        readinessProbe:
+#          httpGet:
+#            path: /
+#            port: 8080
+#            scheme: HTTP
+#          initialDelaySeconds: 5
+#          periodSeconds: 5
+#          successThreshold: 1
+#          failureThreshold: 10
+---

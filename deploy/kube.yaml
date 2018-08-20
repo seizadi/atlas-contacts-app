@@ -21,12 +21,15 @@ metadata:
   namespace: contacts
   name: contacts-app-ingress
   annotations:
-    ingress.kubernetes.io/auth-url: http://authn-stub.atlas-stubs.svc.cluster.local/auth
-    ingress.kubernetes.io/auth-response-headers: Grpc-Metadata-Authorization
-    ingress.kubernetes.io/rewrite-target: /
+#    ingress.kubernetes.io/auth-url: http://authn-stub.atlas-stubs.svc.cluster.local/auth
+#    ingress.kubernetes.io/auth-response-headers: Grpc-Metadata-Authorization
+#    ingress.kubernetes.io/rewrite-target: /
+    nginx.ingress.kubernetes.io/rewrite-target: /
+
 spec:
   rules:
-  - http:
+  - host: contacts.minikube
+    http:
       paths:
       - path: /atlas-contacts-app
         backend:
