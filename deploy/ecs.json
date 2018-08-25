@@ -178,8 +178,14 @@
         },
         "ContainerDefinitions":[
           {
-            "Name":"contacts-server",
+            "Name":"contacts-app",
             "Cpu":"10",
+            "Environment" : [
+              {
+                "Name": "ATLAS_DATABASE_HOST",
+                "Value": "soheil-contacts-rds.cwoqzww5tdav.us-west-1.rds.amazonaws.com"
+              }
+            ],
             "Essential":"true",
             "Image":"soheileizadi/contacts-server:latest",
             "Memory":"1024",
@@ -192,7 +198,7 @@
                 "awslogs-region":{
                   "Ref":"AWS::Region"
                 },
-                "awslogs-stream-prefix":"contacts-server"
+                "awslogs-stream-prefix":"contacts-app"
               }
             },
             "PortMappings":[
@@ -349,6 +355,26 @@
         "KeyName":{
           "Ref":"KeyName"
         },
+        "Tags" : [
+          {
+            "Key" : "Owner",
+            "Value" : "seizadi"
+          },
+          {
+            "Key" : "Product",
+            "Value" : "atlas"
+          },         {
+            "Key" : "Component",
+            "Value" : "contacts-app"
+          },
+          {
+            "Key" : "Env",
+            "Value" : "dev"
+          },         {
+            "Key" : "Protected",
+            "Value" : "true"
+          }
+        ],
         "UserData":{
           "Fn::Base64":{
             "Fn::Join":[
