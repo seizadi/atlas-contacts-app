@@ -223,4 +223,105 @@ The critical element is the ContainerDefinitions:
             ]
           }
 ```
+## Issues
+Found issue getting dynamic ports to work with AWS ALB Target Group:
+```
+Good day,
 
+ My name is Junaid and I'll be working with you on this case today.
+
+  I understand that your cloud formation stack with different health and traffic ports fails with the error message as :
+"The task definition is configured to use a dynamic host port, but the target group with targetGroupArn arn:aws:elasticloadbalancing:us-west-1:405093580753:targetgroup/ECSTG/da48f96c7786ab3f has a health check port specified.
+(Service: AmazonECS; Status Code: 400; Error Code: InvalidParameterException; Request ID: 39537fc7-aa4c-11e8-9700-6b831e64f11c)"
+
+I was able to reproduce the issue from my side when utilizing a CloudFormation stack to create an ECS service with a target group which has a specific health check port and dynamic port mapping is used. I also got the same error message: "The task definition is configured to use a dynamic host port, but the target group with targetGroupArn xxxxxxxxxxx/MyTargetGroup has a health check port specified.
+
+I dig deeper into this behaviour and found that custom health port is not supported by ECS yet, However, Allowing a custom health check options in ECS is an existing feature request which the service team is looking into and I have added your company name to the list of customers requesting this feature. So just to set the expectation here, this is something that may take months to be implemented. I do suggest that you keep an eye on the AWS release page [1].
+
+There are a few workarounds I see which you may consider to fix the issue :
+
+1: Use the same port for Traffic and Health checks, that is whichever port is registered to the TargetGroup will be checked. You can provide a custom path for health checks as well. Ref[2][3]
+
+2: Use "healthCheck" property in the Task definition where you can specify curl commands like this  [ "CMD-SHELL", "curl -f http://localhost:8080/ || exit 1" ] Ref[4][5]
+
+3:  Use a static port for the health check by exposing multiple ports on the container: Traffic port(8080) and health check port(8081).
+Have dynamic port mapping for traffic port and static host port mapping for health check port(8081). There is one limitation to this approach: you will have only one task per instance. You can optimize resource utilization by using as small an instance as possible so that CPU and memory resource is not wasted.
+
+--- from your task definition ---
+      "portMappings": [
+        {
+          "containerPort": 8080,
+          "hostPort": 0,
+          "protocol": "tcp"
+        },
+        {
+          "containerPort": 8081,
+          "hostPort": 8081,
+          "protocol": "tcp"
+        }
+      ],
+--- end ---
+
+
+Hope that the above information was helpful. Please let me know in case I have missed anything or should you have any other queries/concerns, or if I did not understand your concern.
+
+Should you require additional assistance, please don't hesitate to contact me. I'm more than happy to assist.
+
+ Have a good day ahead!
+
+References:
+[1] https://aws.amazon.com/new/
+[2] https://docs.aws.amazon.com/AmazonECS/latest/developerguide/service-load-balancing.html
+[3] https://docs.aws.amazon.com/elasticloadbalancing/latest/network/load-balancer-target-groups.html
+[4] https://docs.aws.amazon.com/AmazonECS/latest/developerguide/task_definition_parameters.html#container_definitions
+[5]https://docs.aws.amazon.com/AmazonECS/latest/APIReference/API_HealthCheck.html#API_HealthCheck_Contents
+
+Best regards,
+
+Junaid B.
+Amazon Web Services
+
+Check out the AWS Support Knowledge Center, a knowledge base of articles and videos that answer customer questions about AWS services: https://aws.amazon.com/premiumsupport/knowledge-center/?icmpid=support_email_category
+
+We value your feedback. Please rate my response using the link below.
+===================================================
+
+To contact us again about this case, please return to the AWS Support Center using the following URL:
+
+https://console.aws.amazon.com/support/home#/case/?displayId=5319422871&language=en
+
+(If you are connecting by federation, log in before following the link.)
+
+*Please note: this e-mail was sent from an address that cannot accept incoming e-mail. Please use the link above if you need to contact us again about this same issue.
+
+====================================================================
+Learn to work with the AWS Cloud. Get started with free online videos and self-paced labs at
+http://aws.amazon.com/training/
+====================================================================
+
+Amazon Web Services, Inc. is an affiliate of Amazon.com, Inc. Amazon.com is a registered trademark of Amazon.com, Inc. or its affiliates.
+
+```
+Need to specify
+[CPU and Memory in a prescribed mix](https://docs.aws.amazon.com/AmazonECS/latest/developerguide/task-cpu-memory-error.html)
+otherwise
+you get an error that is obscure!
+```
+I was able to reproduce this and look at the Service before it terminated.
+
+service soheil-test-2-service-55QHR2FE9FKP was unable to place a task because no container instance met all of its requirements. The closest matching container-instance 40f53686-1332-4b7b-97b1-5b7de7586fd3 has insufficient memory available. For more information, see the Troubleshooting section.
+
+Aug 28, 2018
+03:01 PM -0700
+
+Service eventually failed...
+
+Service arn:aws:ecs:us-west-1:405093580753:service/soheil-test-service-YQJ5A9MCG8K1 did not stabilize.
+
+Aug 28, 2018
+01:48 PM -0700
+
+The following Cloud Formation Template is hung it has been over 2 hours now, I will leave it here for you to look at, at this point all resources have been created except the Service.
+
+https://us-west-1.console.aws.amazon.com/cloudformation/home?region=us-west-1#/stack/detail?stackId=arn:aws:cloudformation:us-west-1:405093580753:stack%2Fsoheil-test%2F58efe5b0-aaf0-11e8-8f79-50fae8e994c6
+```

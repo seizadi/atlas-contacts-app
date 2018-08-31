@@ -25,7 +25,7 @@
     "InstanceType":{
       "Description":"EC2 instance type",
       "Type":"String",
-      "Default":"t2.micro",
+      "Default":"t2.small",
       "AllowedValues":[
         "t2.micro",
         "t2.small",
@@ -158,8 +158,7 @@
               }
             ]
           ]
-        },
-        "RetentionInDays":14
+        }
       }
     },
     "taskdefinition":{
@@ -179,7 +178,7 @@
         "ContainerDefinitions":[
           {
             "Name":"contacts-app",
-            "Cpu":"10",
+            "Cpu":"1024",
             "Environment" : [
               {
                 "Name": "ATLAS_DATABASE_HOST",
@@ -188,7 +187,7 @@
             ],
             "Essential":"true",
             "Image":"soheileizadi/contacts-server:latest",
-            "Memory":"1024",
+            "Memory":"2048",
             "LogConfiguration":{
               "LogDriver":"awslogs",
               "Options":{
@@ -287,13 +286,12 @@
       "DependsOn":"ECSALB",
       "Properties":{
         "HealthCheckIntervalSeconds":10,
-        "HealthCheckPath":"/healthz",
+        "HealthCheckPath":"/swagger",
         "HealthCheckProtocol":"HTTP",
-        "HealthCheckPort":8081,
         "HealthCheckTimeoutSeconds":5,
         "HealthyThresholdCount":2,
         "Name":"ECSTG",
-        "Port":80,
+        "Port":8080,
         "Protocol":"HTTP",
         "UnhealthyThresholdCount":2,
         "VpcId":{
@@ -355,26 +353,6 @@
         "KeyName":{
           "Ref":"KeyName"
         },
-        "Tags" : [
-          {
-            "Key" : "Owner",
-            "Value" : "seizadi"
-          },
-          {
-            "Key" : "Product",
-            "Value" : "atlas"
-          },         {
-            "Key" : "Component",
-            "Value" : "contacts-app"
-          },
-          {
-            "Key" : "Env",
-            "Value" : "dev"
-          },         {
-            "Key" : "Protected",
-            "Value" : "true"
-          }
-        ],
         "UserData":{
           "Fn::Base64":{
             "Fn::Join":[
@@ -414,8 +392,8 @@
         "DesiredCount":"1",
         "LoadBalancers":[
           {
-            "ContainerName":"contact-app",
-            "ContainerPort":"80",
+            "ContainerName":"contacts-app",
+            "ContainerPort":"8080",
             "TargetGroupArn":{
               "Ref":"ECSTG"
             }
