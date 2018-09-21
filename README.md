@@ -133,7 +133,7 @@ admin2:admin -> AccountID=2
 
 ##### Usage
 
-Try it out by executing following curl commands:
+Try it out by executing following curl commands when AuthN stub is running:
 
 ``` sh
 # Create some profiles
@@ -169,6 +169,13 @@ https://$(minikube ip)/atlas-contacts-app/v1/groups | jq
 
 curl -k -H "User-And-Pass: admin1:admin" \
 https://$(minikube ip)/atlas-contacts-app/v1/contacts | jq
+```
+
+The following commands without AuthN stub:
+```bash
+export JWT="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJBY2NvdW50SUQiOjF9.GsXyFDDARjXe1t9DPo2LIBKHEal3O7t3vLI3edA7dGU"
+curl -H "Authorization: Bearer $JWT" http://contacts.minikube/atlas-contacts-app/v1/contacts -d '{"first_name": "Mike", "primary_email": "mike@gmail.com"}'
+curl -H "Authorization: Bearer $JWT" http://contacts.minikube/atlas-contacts-app/v1/contacts
 ```
 
 ##### Pagination (page token)
