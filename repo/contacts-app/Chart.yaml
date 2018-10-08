@@ -1,0 +1,4 @@
+apiVersion: v1
+description: Contacts Application
+name: contacts-app
+version: 0.1.0

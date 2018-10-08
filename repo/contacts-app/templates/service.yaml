@@ -1,0 +1,28 @@
+{{- $fullName := include "contacts-app.fullname" . -}}
+{{- $appName := include "contacts-app.name" . -}}
+{{- $servicePort := .Values.service.port -}}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ $fullName }}
+{{- if .Values.cmdb }}
+  namespace: {{ .Values.nameSpace }}
+{{- end }}
+  labels:
+    app: {{ $appName }}
+    chart: {{ template "contacts-app.chart" . }}
+    release: {{ .Release.Name }}
+    heritage: {{ .Release.Service }}
+spec:
+  type: {{ .Values.service.type }}
+  ports:
+    - port: {{ .Values.service.port }}
+      targetPort: {{ .Values.service.targetPort }}
+{{- if .Values.service.nodePort }}
+      nodePort: {{ .Values.service.nodePort }}
+{{- end }}
+      protocol: TCP
+      name: http
+  selector:
+    app: {{ $appName }}
+    release: {{ .Release.Name }}
